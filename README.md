@@ -8,6 +8,8 @@ PaidUp chases late invoices, understands what clients reply, and only marks an i
 
 ![PaidUp architecture](docs/architecture.png)
 
+More diagrams, including the agent turn flow, approval round trip, invoice statuses, reply understanding, reminder cadence, approval rules, and data model: [docs/diagrams.md](docs/diagrams.md).
+
 ## The problem
 
 Freelancers and small businesses do the work, send the invoice, and then become part-time debt collectors. Replies like *"I'll pay Friday"* or *"we already paid"* get buried in email, and nobody checks whether the money actually arrived.
