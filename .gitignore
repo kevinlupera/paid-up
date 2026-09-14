@@ -1,0 +1,23 @@
+# Secrets and local credentials
+.env
+.env.*
+!.env.example
+*.pem
+credentials
+.aws/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# Local data and agent sessions (keep real invoices and statements out of the public repo)
+*.sqlite
+*.db
+sessions/
+data/private/
+
+# OS / editor
+.DS_Store
