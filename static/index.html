@@ -1,0 +1,425 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PaidUp</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+<style>
+  :root {
+    --ground: #F3F5F8; --surface: #FFFFFF; --ink: #121820; --muted: #5B6675; --line: #DDE2E8; --soft: #EEF1F5;
+    --accent: #1F4FD6; --accent-ink: #FFFFFF;
+    --paid: #1B7A48; --paid-bg: #E2F3EA;
+    --partial: #0F6E7A; --partial-bg: #DDF1F3;
+    --confirm: #8A5A00; --confirm-bg: #FBEFD5;
+    --claim: #A5480B; --claim-bg: #FCE7D8;
+    --overdue: #B3261E; --overdue-bg: #FBE3E1;
+    --open: #4B5563; --open-bg: #E9ECF0;
+    --dispute: #6B3FB8; --dispute-bg: #EEE7FA;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--ground); color: var(--ink); font: 18px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  button { font: inherit; }
+  :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+  header { display: flex; flex-wrap: wrap; align-items: center; gap: 16px 32px; padding: 20px 32px; background: var(--surface); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 2; }
+  .brand h1 { margin: 0; font-size: 30px; letter-spacing: -0.02em; }
+  .brand p { margin: 0; color: var(--muted); font-size: 16px; }
+  .today { font-family: var(--mono); font-size: 18px; padding: 6px 12px; background: var(--soft); border-radius: 6px; }
+  .actions { display: flex; gap: 10px; margin-left: auto; flex-wrap: wrap; }
+  .btn { border: 1px solid var(--line); background: var(--surface); color: var(--ink); padding: 10px 18px; border-radius: 8px; cursor: pointer; font-weight: 600; }
+  .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+  .status-line { width: 100%; display: flex; gap: 16px; align-items: center; min-height: 28px; }
+  .status-line:not(:has(> :not([hidden]))) { display: none; }
+  .working { color: var(--accent); font-weight: 600; }
+  .error { color: var(--overdue); font-weight: 600; }
+
+  main { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr); gap: 24px; padding: 24px 32px 48px; }
+  @media (max-width: 1100px) { main { grid-template-columns: 1fr; } }
+  /* min-width: 0 lets grid columns shrink instead of stretching to their widest content. */
+  .col { display: grid; grid-template-columns: minmax(0, 1fr); gap: 24px; align-content: start; min-width: 0; }
+  section { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 20px 22px; min-width: 0; }
+  section h2 { margin: 0 0 14px; font-size: 20px; }
+  .empty { color: var(--muted); margin: 0; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 17px; }
+  th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  th { font-size: 14px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; font-family: var(--mono); }
+  tr:last-child td { border-bottom: 0; }
+  .rows { font-family: var(--mono); font-size: 14px; color: var(--muted); }
+  .pill { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 14px; font-weight: 700; white-space: nowrap; }
+  .pill.paid { color: var(--paid); background: var(--paid-bg); }
+  .pill.partial { color: var(--partial); background: var(--partial-bg); }
+  .pill.needs_confirmation { color: var(--confirm); background: var(--confirm-bg); }
+  .pill.reported_not_confirmed { color: var(--claim); background: var(--claim-bg); }
+  .pill.overdue { color: var(--overdue); background: var(--overdue-bg); }
+  .pill.open { color: var(--open); background: var(--open-bg); }
+  .pill.dispute { color: var(--dispute); background: var(--dispute-bg); }
+  .note { font-size: 14px; color: var(--muted); }
+
+  .unmatched { margin-top: 16px; padding: 14px 16px; border-radius: 8px; background: var(--confirm-bg); color: var(--confirm); }
+  .unmatched h3 { margin: 0 0 6px; font-size: 16px; }
+  .unmatched ul { margin: 0; padding-left: 20px; font-family: var(--mono); font-size: 15px; }
+
+  .approvals { border: 3px solid var(--accent); box-shadow: 0 6px 24px rgba(31, 79, 214, .18); }
+  .approvals h2 { color: var(--accent); font-size: 24px; }
+  .approval { display: grid; gap: 10px; padding: 14px 0; border-top: 1px solid var(--line); }
+  .approval:first-of-type { border-top: 0; padding-top: 0; }
+  .meta { display: flex; flex-wrap: wrap; gap: 8px 20px; font-size: 16px; }
+  .meta b { font-family: var(--mono); }
+  .fee { color: var(--overdue); font-weight: 700; }
+  .body { white-space: pre-wrap; background: var(--soft); border-radius: 8px; padding: 14px 16px; font-size: 16px; margin: 0; }
+  .choices { display: flex; gap: 10px; flex-wrap: wrap; }
+  .choice.approve[aria-pressed="true"] { background: var(--paid); color: #fff; border-color: var(--paid); }
+  .choice.trust[aria-pressed="true"] { background: var(--partial); color: #fff; border-color: var(--partial); }
+  .choice.reject[aria-pressed="true"] { background: var(--overdue); color: #fff; border-color: var(--overdue); }
+
+  .reply { display: grid; grid-template-columns: 1fr auto; gap: 6px 16px; padding: 12px 0; border-top: 1px solid var(--line); }
+  .reply:first-of-type { border-top: 0; padding-top: 0; }
+  .reply .from { font-size: 15px; color: var(--muted); }
+  .reply .subject { font-weight: 700; }
+  .reply .preview { grid-column: 1 / -1; font-size: 16px; color: var(--ink); white-space: pre-wrap; }
+  .reply .done { color: var(--paid); font-weight: 600; font-size: 15px; }
+
+  .summary { font-size: 17px; }
+  .summary table { font-size: 15px; }
+  .summary h1, .summary h2, .summary h3 { font-size: 18px; margin: 14px 0 6px; }
+  .summary p, .summary ul { margin: 6px 0; }
+
+  .list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .list li { display: flex; gap: 12px; align-items: baseline; font-size: 16px; min-width: 0; }
+  .list .when { font-family: var(--mono); font-size: 14px; color: var(--muted); white-space: nowrap; }
+  .audit li { font-size: 14px; }
+  .audit .detail { font-family: var(--mono); color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 420px; min-width: 0; }
+
+  .totals { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; padding: 24px 32px 0; }
+  .tile { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 20px; min-width: 0; }
+  .tile .label { font-size: 14px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  .tile .value { font: 700 34px/1.25 var(--mono); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+  .tile.paid .value { color: var(--paid); }
+  .tile.claim .value { color: var(--claim); }
+  .tile.paused .value { color: var(--dispute); }
+
+  /* One-shot highlights after an agent turn changes something. */
+  @keyframes flash { from { background: #FFF1B8; box-shadow: 0 0 0 3px #F2C94C; } to { background: var(--surface); box-shadow: 0 0 0 0 transparent; } }
+  @keyframes row-flash { from { background: #FFF1B8; } to { background: transparent; } }
+  .tile.flash { animation: flash 2s ease-out; }
+  .ledger tr.changed { animation: row-flash 2.5s ease-out; }
+  .change { margin-top: 4px; font-size: 13px; font-weight: 700; color: var(--accent); white-space: nowrap; }
+  @media (prefers-reduced-motion: reduce) { .tile.flash, .ledger tr.changed { animation: none; } }
+
+  .signals { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; }
+  mark { background: #FFE58F; color: inherit; padding: 0 2px; border-radius: 3px; }
+  .quote-missing { grid-column: 1 / -1; font-size: 14px; font-style: italic; color: var(--muted); overflow-wrap: anywhere; }
+
+  /* Wide content never pushes the page sideways. */
+  .table-wrap { overflow-x: auto; }
+  .summary table { display: block; overflow-x: auto; }
+  .body, .reply .from, .unmatched li { overflow-wrap: anywhere; }
+
+  @media (max-width: 1100px) {
+    header { padding: 16px 24px; }
+    .totals { padding: 20px 24px 0; }
+    main { padding: 20px 24px 40px; }
+  }
+
+  @media (max-width: 720px) {
+    body { font-size: 16px; }
+    header { position: static; padding: 14px 16px; gap: 10px 16px; }
+    .brand h1 { font-size: 24px; }
+    .brand p, .today { font-size: 15px; }
+    .actions { margin-left: 0; width: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .actions #review { grid-column: 1 / -1; order: -1; }
+    .btn { padding: 12px 14px; }
+    .totals { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding: 16px 16px 0; }
+    .tile { padding: 12px 14px; }
+    .tile .label { font-size: 12px; }
+    .tile .value { font-size: 22px; }
+    main { padding: 16px 16px 32px; gap: 16px; }
+    .col { gap: 16px; }
+    section { padding: 16px; }
+    .approvals h2 { font-size: 20px; }
+    .body { font-size: 15px; padding: 12px; }
+    .choices .btn { flex: 1 1 auto; }
+    .list li { flex-wrap: wrap; row-gap: 2px; }
+    .audit .detail { flex-basis: 100%; max-width: 100%; }
+
+    /* Ledger rows become cards: invoice and status on top, figures below. */
+    .ledger thead { display: none; }
+    .ledger, .ledger tbody { display: block; }
+    .ledger tr { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+    .ledger tr:last-child { border-bottom: 0; }
+    .ledger td { display: block; padding: 0; border: 0; text-align: left; }
+    .ledger td[data-label]::before {
+      content: attr(data-label); display: block; font: 600 12px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      color: var(--muted); text-transform: uppercase; letter-spacing: .04em;
+    }
+    .ledger .c-invoice { grid-area: 1 / 1; }
+    .ledger .c-status { grid-area: 1 / 2; justify-self: end; text-align: right; }
+    .ledger .c-client { grid-area: 2 / 1 / 3 / 3; color: var(--muted); }
+    .ledger .c-amount { grid-area: 3 / 1; }
+    .ledger .c-balance { grid-area: 3 / 2; }
+    .ledger .c-days { grid-area: 4 / 1; }
+    .ledger .c-rows { grid-area: 4 / 2; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <h1>PaidUp</h1>
+    <p>Collections agent for freelancers</p>
+  </div>
+  <span class="today" id="today">—</span>
+  <div class="actions">
+    <button class="btn" id="reset">Reset demo</button>
+    <button class="btn primary" id="review">Run daily review</button>
+    <button class="btn" id="april">Load April statement</button>
+  </div>
+  <div class="status-line" role="status" aria-live="polite">
+    <span class="working" id="working" hidden>Agent working…</span>
+    <span class="error" id="error" hidden></span>
+  </div>
+</header>
+
+<div class="totals" id="totals" aria-label="Totals"></div>
+
+<main>
+  <div class="col">
+    <section class="approvals" id="approvals" hidden>
+      <h2>Waiting for your approval</h2>
+      <div id="approval-list"></div>
+    </section>
+
+    <section>
+      <h2>Receivables</h2>
+      <div class="table-wrap">
+        <table class="ledger">
+          <thead><tr><th>Invoice</th><th>Client</th><th class="num">Amount</th><th class="num">Balance</th><th class="num">Days late</th><th>Status</th><th>Bank rows</th></tr></thead>
+          <tbody id="ledger"></tbody>
+        </table>
+      </div>
+      <div class="unmatched" id="unmatched" hidden>
+        <h3>Payments not linked to any invoice</h3>
+        <ul id="unmatched-list"></ul>
+      </div>
+    </section>
+
+    <section>
+      <h2>Agent summary</h2>
+      <div class="summary" id="summary"><p class="empty">Run the daily review to start.</p></div>
+    </section>
+  </div>
+
+  <div class="col">
+    <section>
+      <h2>Client inbox</h2>
+      <div id="inbox"></div>
+    </section>
+
+    <section>
+      <h2>Outbox</h2>
+      <ul class="list" id="outbox"></ul>
+    </section>
+
+    <section>
+      <h2>Audit log</h2>
+      <ul class="list audit" id="audit"></ul>
+    </section>
+  </div>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const LABELS = {
+  paid: "Paid", partial: "Partial", needs_confirmation: "Needs confirmation",
+  reported_not_confirmed: "Claimed, not in bank", overdue: "Overdue", open: "Not due", dispute: "Disputed",
+};
+let state = null;
+let busy = false;
+const choices = {};
+const TILES = [
+  ["outstanding", "Outstanding", "", true], ["confirmed_in_bank", "Confirmed in bank", "paid", true],
+  ["claimed_not_in_bank", "Claimed, not in bank", "claim", true], ["paused", "Paused invoices", "paused", false],
+];
+const SIGNALS = {
+  promise: ["partial", (s) => `Promise · ${shortDate(s.promised_on)}`],
+  claim: ["reported_not_confirmed", () => "Claims paid"],
+  dispute: ["dispute", () => "Dispute"],
+};
+let changes = {};            // invoice number -> "Overdue → Partial", kept until the next action
+let flashRows = new Set();   // consumed by the next render only, so animations play once
+let flashTiles = new Set();
+
+function displayStatus(i) {
+  return i.open_dispute && i.status !== "paid" ? "dispute" : i.status;
+}
+function shortDate(iso) {
+  return iso ? new Date(`${iso}T00:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "no date";
+}
+function diff(before, after) {
+  const old = Object.fromEntries(before.invoices.map((i) => [i.number, displayStatus(i)]));
+  changes = {};
+  for (const i of after.invoices) {
+    const now = displayStatus(i);
+    if (old[i.number] && old[i.number] !== now) changes[i.number] = `${LABELS[old[i.number]]} → ${LABELS[now]}`;
+  }
+  flashRows = new Set(Object.keys(changes));
+  flashTiles = new Set(TILES.map(([key]) => key).filter((key) => String(before.totals[key]) !== String(after.totals[key])));
+}
+function highlight(body, quotes) {
+  // Case-insensitive, whitespace-tolerant match; only escaped text segments reach innerHTML.
+  const ranges = [], missing = [];
+  for (const quote of quotes) {
+    const words = quote.trim().split(/\s+/).filter(Boolean).map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+    const match = words.length ? new RegExp(words.join("\\s+"), "i").exec(body) : null;
+    if (match) ranges.push([match.index, match.index + match[0].length]); else missing.push(quote);
+  }
+  ranges.sort((a, b) => a[0] - b[0]);
+  let html = "", at = 0;
+  for (const [start, end] of ranges) {
+    if (start < at) continue;
+    html += `${esc(body.slice(at, start))}<mark>${esc(body.slice(start, end))}</mark>`;
+    at = end;
+  }
+  return { html: html + esc(body.slice(at)), missing };
+}
+
+function esc(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+function money(value) {
+  return "$" + Number(value).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+async function api(method, path, body, compare = true) {
+  busy = true;
+  $("error").hidden = true;
+  $("working").hidden = method === "GET";
+  if (method !== "GET") changes = {};
+  const before = state;
+  render();
+  try {
+    const response = await fetch(path, {
+      method, headers: { "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined,
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.detail || `The server answered ${response.status}.`);
+    if (compare && before && method !== "GET") diff(before, data);
+    state = data;
+  } catch (error) {
+    $("error").textContent = error.message === "Failed to fetch" ? "The PaidUp server is not reachable." : error.message;
+    $("error").hidden = false;
+  } finally {
+    busy = false;
+    $("working").hidden = true;
+    render();
+  }
+}
+
+function render() {
+  if (!state) return;
+  const pending = state.pending.length > 0;
+  $("today").textContent = "Today: " + state.today;
+  $("reset").disabled = busy;
+  $("review").disabled = busy || pending;
+  $("april").disabled = busy || pending || state.april_loaded;
+
+  $("totals").innerHTML = TILES.map(([key, label, tone, isMoney]) =>
+    `<div class="tile ${tone}${flashTiles.has(key) ? " flash" : ""}"><div class="label">${label}</div>
+      <div class="value">${isMoney ? money(state.totals[key]) : esc(state.totals[key])}</div></div>`).join("");
+
+  $("ledger").innerHTML = state.invoices.map((i) => {
+    const status = displayStatus(i);
+    const change = changes[i.number] ? `<div class="change">${esc(changes[i.number])}</div>` : "";
+    const promise = i.promised_on && i.status !== "paid" ? `<div class="note">Promised ${esc(i.promised_on)}</div>` : "";
+    const candidates = i.candidate_bank_rows.length ? `<div class="note">Candidate: ${esc(i.candidate_bank_rows.join(", "))}</div>` : "";
+    return `<tr class="${flashRows.has(i.number) ? "changed" : ""}">
+      <td class="c-invoice"><b>${esc(i.number)}</b></td><td class="c-client">${esc(i.client)}</td>
+      <td class="num c-amount" data-label="Amount">${money(i.amount)}</td>
+      <td class="num c-balance" data-label="Balance">${money(i.balance)}</td>
+      <td class="num c-days" data-label="Days late">${i.days_overdue || "—"}</td>
+      <td class="c-status"><span class="pill ${status}">${LABELS[status]}</span>${promise}${change}</td>
+      <td class="rows c-rows" data-label="Bank rows">${esc(i.bank_rows.join(", ")) || "—"}${candidates}</td>
+    </tr>`;
+  }).join("");
+
+  $("unmatched").hidden = state.unmatched_bank_rows.length === 0;
+  $("unmatched-list").innerHTML = state.unmatched_bank_rows.map((r) =>
+    `<li>${esc(r.row_id)} · ${esc(r.booked_on)} · ${money(r.amount)} · ${esc(r.description)}</li>`).join("");
+
+  $("approvals").hidden = !pending;
+  $("approval-list").innerHTML = state.pending.map((p) => {
+    const a = p.args || {};
+    const stage = p.tool === "send_formal_notice" ? "formal" : a.stage;
+    const fee = a.late_fee ? `<span class="fee">Late fee ${money(a.late_fee)}</span>` : "";
+    const options = ["approve", ...(p.tool === "send_reminder" ? ["trust"] : []), "reject"];
+    const names = { approve: "Approve", trust: "Trust this stage", reject: "Reject" };
+    return `<div class="approval">
+      <div class="meta"><span>Action <b>${esc(p.tool)}</b></span>
+        ${a.invoice_number ? `<span>Invoice <b>${esc(a.invoice_number)}</b></span>` : ""}
+        ${stage ? `<span>Stage <b>${esc(stage)}</b></span>` : ""}
+        ${a.row_id ? `<span>Bank row <b>${esc(a.row_id)}</b></span>` : ""}${fee}</div>
+      ${a.body ? `<pre class="body">${esc(a.body)}</pre>` : ""}
+      <div class="choices">${options.map((o) =>
+        `<button class="btn choice ${o}" data-id="${esc(p.id)}" data-answer="${o}" aria-pressed="${choices[p.id] === o}" ${busy ? "disabled" : ""}>${names[o]}</button>`).join("")}
+      </div>
+    </div>`;
+  }).join("");
+
+  $("inbox").innerHTML = state.replies.map((r) => {
+    const detected = r.detected || [];
+    const marked = highlight(r.body, r.delivered ? detected.map((s) => s.quote) : []);
+    const badges = detected.length
+      ? detected.map((s) => `<span class="pill ${SIGNALS[s.kind][0]}">${esc(SIGNALS[s.kind][1](s))}</span>`).join("")
+      : '<span class="pill open">Unclear · nothing recorded</span>';
+    return `<div class="reply">
+      <div><div class="from">${esc(r.from)} · ${esc(r.received_on)}</div><div class="subject">${esc(r.subject)}</div></div>
+      <div>${r.delivered ? '<span class="done">Delivered</span>'
+        : `<button class="btn" data-reply="${r.index}" ${busy || pending ? "disabled" : ""}>Deliver</button>`}</div>
+      ${r.delivered ? `<div class="signals">${badges}</div>` : ""}
+      <div class="preview">${marked.html}</div>
+      ${marked.missing.map((q) => `<div class="quote-missing">Quote: “${esc(q)}”</div>`).join("")}
+    </div>`;
+  }).join("");
+
+  const text = state.summary || "";
+  $("summary").innerHTML = text
+    ? (window.marked ? marked.parse(esc(text)) : `<p style="white-space:pre-wrap">${esc(text)}</p>`)
+    : '<p class="empty">Run the daily review to start.</p>';
+
+  $("outbox").innerHTML = state.outbox.length ? state.outbox.map((m) =>
+    `<li><span class="when">${esc(m.sent_on)}</span><b>${esc(m.invoice)}</b><span class="pill ${m.stage === "formal" ? "overdue" : "open"}">${esc(m.stage)}</span></li>`).join("")
+    : '<li class="empty">No messages sent yet.</li>';
+
+  $("audit").innerHTML = state.audit.map((e) =>
+    `<li><span class="when">${esc(e.ts.slice(11, 19))}</span><b>${esc(e.actor)}</b><span>${esc(e.action)}</span><span class="detail">${esc(JSON.stringify(e.detail))}</span></li>`).join("");
+
+  flashRows = new Set();
+  flashTiles = new Set();
+}
+
+document.addEventListener("click", (event) => {
+  const target = event.target.closest("button");
+  if (!target || busy) return;
+  if (target.id === "reset") { Object.keys(choices).forEach((k) => delete choices[k]); api("POST", "/api/reset", undefined, false); }
+  else if (target.id === "review") api("POST", "/api/review");
+  else if (target.id === "april") api("POST", "/api/bank/april");
+  else if (target.dataset.reply !== undefined) api("POST", `/api/replies/${target.dataset.reply}`);
+  else if (target.dataset.answer) {
+    choices[target.dataset.id] = target.dataset.answer;
+    const answers = Object.fromEntries(state.pending.map((p) => [p.id, choices[p.id]]));
+    if (Object.values(answers).every(Boolean)) {
+      state.pending.forEach((p) => delete choices[p.id]);
+      api("POST", "/api/approvals", { answers });
+    } else render();
+  }
+});
+
+api("GET", "/api/state");
+</script>
+</body>
+</html>

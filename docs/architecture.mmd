@@ -1,0 +1,57 @@
+%%{init: {"theme": "base", "flowchart": {"nodeSpacing": 40, "rankSpacing": 60, "padding": 16}, "themeVariables": {"fontSize": "22px", "fontFamily": "Helvetica, Arial, sans-serif", "lineColor": "#56606B", "primaryTextColor": "#141A21", "clusterBkg": "#F4F6F8", "clusterBorder": "#D9DFE6"}}}%%
+flowchart TB
+  subgraph EVENTS["Events"]
+    direction LR
+    INV["New invoice"]
+    BANK["Bank statement CSV"]
+    MAIL["Client reply"]
+    CLOCK["Due date or<br/>promised date"]
+  end
+
+  API["Entrypoint<br/>FastAPI or AgentCore Runtime"]
+  AGENT["Strands Agent<br/>Amazon Bedrock model"]
+  SESS[("Strands<br/>session manager")]
+
+  subgraph MODEL["Model decides"]
+    direction TB
+    INTENT["Reply intent<br/>structured output + exact quote"]
+    DRAFT["Stage-aware<br/>message draft"]
+  end
+
+  subgraph TOOLS["Code decides"]
+    direction TB
+    LEDGER["Ledger and aging"]
+    REC["Bank reconciliation<br/>paid only with a bank row"]
+    CAD["Cadence and<br/>contract late-fee rules"]
+  end
+
+  HOOK{{"Approval hook<br/>BeforeToolCallEvent + interrupt"}}
+  HUMAN(["Account owner<br/>approve · trust · reject"])
+  OUT["Idempotent outbox<br/>key: invoice + stage"]
+  DB[("State and audit log<br/>invoices · promises · disputes · messages")]
+
+  INV --> API
+  BANK --> API
+  MAIL --> API
+  CLOCK --> API
+  API --> AGENT
+  AGENT <--> SESS
+  AGENT --> MODEL
+  AGENT --> TOOLS
+  DRAFT --> HOOK
+  HOOK <--> HUMAN
+  HOOK -->|approved| OUT
+  TOOLS --> DB
+  OUT --> DB
+
+  classDef code fill:#E3F2EA,stroke:#1F7A4D,stroke-width:2px,color:#141A21
+  classDef model fill:#ECE9F8,stroke:#5A48B5,stroke-width:2px,color:#141A21
+  classDef human fill:#F8E4E8,stroke:#B4233C,stroke-width:2px,color:#141A21
+  classDef core fill:#E4E9FB,stroke:#2346C8,stroke-width:2px,color:#141A21
+  classDef store fill:#FFFFFF,stroke:#56606B,stroke-width:2px,color:#141A21
+  class LEDGER,REC,CAD,OUT,API code
+  class INTENT,DRAFT model
+  class HOOK,HUMAN human
+  class AGENT core
+  class DB,SESS store
+  class INV,BANK,MAIL,CLOCK store

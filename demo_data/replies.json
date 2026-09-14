@@ -1,0 +1,30 @@
+[
+  {
+    "received_on": "2026-04-01",
+    "from": "tom@orbitmedia.example",
+    "client": "Orbit Media",
+    "subject": "Re: Invoice INV-1005",
+    "body": "Hi Alex,\n\nSorry for the delay. I'll pay INV-1005 this Friday, April 3.\n\nThanks,\nTom"
+  },
+  {
+    "received_on": "2026-04-01",
+    "from": "billing@cedarco.example",
+    "client": "Cedar & Co",
+    "subject": "Re: Invoice INV-1003",
+    "body": "Hello,\n\nWe already paid INV-1003 on the 3rd, please check your account.\n\nRegards,\nCedar & Co Accounts"
+  },
+  {
+    "received_on": "2026-04-01",
+    "from": "maria@cedarco.example",
+    "client": "Cedar & Co",
+    "subject": "Re: Invoice INV-1004",
+    "body": "Hi,\n\nAbout INV-1004: we never received the final files, so we can't process this invoice yet.\n\nMaria"
+  },
+  {
+    "received_on": "2026-04-01",
+    "from": "ops@northwindstudio.example",
+    "client": "Northwind Studio",
+    "subject": "Re: Your invoice",
+    "body": "Got it, I'll forward this to our accounting team."
+  }
+]
